@@ -150,16 +150,71 @@ def calculate_cost(usage_data):
     return usage_by_user, all_accounts
 
 
+def format_output(usage_by_user, total_cost, gpu_limits):
+    # Table header
+    header = ""
+    header += "┌──────────────┬──────────────┬────────────────────────────────────────────────┬────────────┬──────────────┐\n"
+    header += "│     User     │    Account   │ Partition Details                              │ Total Cost │ GPU Limit    │\n"
+    header += "├──────────────┼──────────────┼────────────────────────────────────────────────┼────────────┼──────────────┤\n"
+
+    # Table body
+    body = ""
+    for user, data in usage_by_user.items():
+        # Assume one account per user for simplicity
+        account = next(iter(data["accounts"]))
+        partition_details = ""
+        partition_details += "┌───────────┬───────────────┬──────────────┐\n"
+        partition_details += "│ Partition │  GPU Minutes  │     Cost     │\n"
+        partition_details += "├───────────┼───────────────┼──────────────┤\n"
+
+        for partition, usage in data["partitions"].items():
+            partition_details += f"│ {partition:<9} │ {usage['gpu_minutes']:>13.0f} │ ${usage['cost']:>11.2f} │\n"
+
+        partition_details += "└───────────┴───────────────┴──────────────┘"
+
+        # Split partition details into lines
+        partition_lines = partition_details.split('\n')
+
+        # Get GPU limit for the user
+        gpu_limit = "N/A"
+        if account in gpu_limits and user in gpu_limits[account]:
+            user_limit = gpu_limits[account][user]
+            if user_limit["total"] is not None:
+                used_minutes = float(
+                    user_limit["used"]) if user_limit["used"] else 0
+                total_minutes = float(
+                    user_limit["total"]) if user_limit["total"] else 0
+                gpu_limit = f"{used_minutes:.0f}/{total_minutes:.0f}"
+
+        # First line with user, account, first line of partition details, total cost, and GPU limit
+        body += f"│ {user:<12} │ {account:<12} │ {partition_lines[0]:<46} │ ${data['total']:>9.2f} │ {gpu_limit:<12} │\n"
+
+        # Remaining lines of partition details
+        for line in partition_lines[1:]:
+            body += f"│              │              │ {line:<46} │            │              │\n"
+
+        if user != list(usage_by_user.keys())[-1]:
+            body += f"├──────────────┼──────────────┼────────────────────────────────────────────────┼────────────┼──────────────┤\n"
+        else:
+            body += f"├──────────────┴──────────────┴────────────────────────────────────────────────┼────────────┼──────────────┤\n"
+
+    # Table footer
+    footer = f"│ Total                                                                        │ ${total_cost:>9.2f} │              │\n"
+    footer += "└──────────────────────────────────────────────────────────────────────────────┴────────────┴──────────────┘"
+
+    return header + body + footer
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Calculate Slurm GPU usage and cost")
     parser.add_argument("username", nargs='?',
                         help="Username to check usage for (optional)")
-    parser.add_argument("-s", "--start", help="Start date (YYYY-MM-DD)",
+    parser.add_argument("-S", "--start", help="Start date (YYYY-MM-DD)",
                         default=(datetime.date.today().replace(day=1)).isoformat())
-    parser.add_argument("-e", "--end", help="End date (YYYY-MM-DD)",
+    parser.add_argument("-E", "--end", help="End date (YYYY-MM-DD)",
                         default=datetime.date.today().isoformat())
-    parser.add_argument("-a", "--account",
+    parser.add_argument("-A", "--account",
                         help="Specific account to check (optional)")
     args = parser.parse_args()
 
@@ -197,46 +252,24 @@ def main():
 
     gpu_limits = get_gpu_limits(all_accounts, args.username)
 
-    total_cost = 0
-    for user, data in usage_by_user.items():
-        print(f"\nGPU Usage report for {user} from {args.start} to {args.end}")
+    total_cost = sum(data['total'] for data in usage_by_user.values())
 
-        for account in data["accounts"]:
-            print(f"Account: {account}")
+    print(f"\nGPU Usage report from {args.start} to {args.end}")
+    print(format_output(usage_by_user, total_cost, gpu_limits))
 
-            # Handle account limit
-            account_limit = gpu_limits.get(account, {}).get("account")
-            if account_limit and account_limit["total"] is not None:
-                used_minutes = float(
-                    account_limit["used"]) if account_limit["used"] else 0
-                total_minutes = float(
-                    account_limit["total"]) if account_limit["total"] else 0
-                print(
-                    f"  Account GPU Minutes: Used: {used_minutes:.0f}, Total: {total_minutes:.0f}")
-
-            # Handle user limit
-            if account in gpu_limits and user in gpu_limits[account]:
-                user_limit = gpu_limits[account][user]
-                if user_limit["total"] is not None:
-                    used_minutes = float(
-                        user_limit["used"]) if user_limit["used"] else 0
-                    total_minutes = float(
-                        user_limit["total"]) if user_limit["total"] else 0
-                    print(
-                        f"  User GPU Minutes: Used: {used_minutes:.0f}, Total: {total_minutes:.0f}")
-
-        user_total = 0
-        for partition, usage in data["partitions"].items():
-            print(f"\n  Partition: {partition}")
-            print(f"    GPU minutes: {round(usage['gpu_minutes'])}")
-            print(f"    Subtotal cost: ${usage['cost']:.2f}")
-            user_total += usage['cost']
-
-        print(f"\n  Total GPU cost for {user}: ${user_total:.2f}")
-        total_cost += user_total
-
-    if current_user == 'root' and len(usage_by_user) > 1:
-        print(f"\nTotal GPU cost across all users: ${total_cost:.2f}")
+    # Print account-level GPU limits information
+    print("\nAccount-level GPU Limits:")
+    for account in all_accounts:
+        account_limit = gpu_limits.get(account, {}).get("account")
+        if account_limit and account_limit["total"] is not None:
+            used_minutes = float(
+                account_limit["used"]) if account_limit["used"] else 0
+            total_minutes = float(
+                account_limit["total"]) if account_limit["total"] else 0
+            print(
+                f"  Account {account}: Used: {used_minutes:.0f}, Total: {total_minutes:.0f}")
+        else:
+            print(f"  Account {account}: N/A")
 
 
 if __name__ == "__main__":
