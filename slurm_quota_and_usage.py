@@ -20,7 +20,7 @@ def get_usage(start_date, end_date, account=None, username=None):
         "sacct", "-n", "-P", "-X",
         "-S", start_date,
         "-E", end_date,
-        "--format=JobID,User,Elapsed,AllocTRES,Partition,Account",
+        "--format=JobID,User,ElapsedRaw,AllocTRES,Partition,Account",
         "--qos=normal_qos,large_qos",
         "--truncate"
     ]
@@ -50,7 +50,6 @@ def get_usage(start_date, end_date, account=None, username=None):
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True, check=True)
-        print(result.stdout)
         return result.stdout.strip().split('\n')
     except subprocess.CalledProcessError as e:
         print(f"Error running sacct command: {e}")
@@ -104,21 +103,9 @@ def get_gpu_limits(accounts, username=None):
     return gpu_limits
 
 
-def parse_time(time_str):
-    if '-' in time_str:
-        days, time = time_str.split('-')
-        hours, minutes, seconds = map(int, time.split(':'))
-        return (int(days) * 24 * 60) + (hours * 60) + minutes + (seconds / 60)
-    else:
-        time_parts = time_str.split(':')
-        if len(time_parts) == 3:
-            hours, minutes, seconds = map(int, time_parts)
-            return (hours * 60) + minutes + (seconds / 60)
-        elif len(time_parts) == 2:
-            minutes, seconds = map(int, time_parts)
-            return minutes + (seconds / 60)
-        else:
-            return int(time_parts[0])
+def parse_time(time_str_in_second):
+    time_str_in_second = int(time_str_in_second)
+    return time_str_in_second / 60
 
 
 def calculate_cost(usage_data):
