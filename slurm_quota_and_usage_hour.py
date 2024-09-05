@@ -258,7 +258,7 @@ def main():
             total_hours = float(
                 account_limit["total"]) / 60 if account_limit["total"] else 0
             print(
-                f"  Account {account}: Used: {used_hours:.2f} Hours, Limit: {total_hours:.2f} Hours")
+                f"  Account {account}: Used: {used_hours:.2f} GPU Hours, Limit: {total_hours:.2f} GPU Hours")
         else:
             print(f"  Account {account}: N/A")
     print("")
