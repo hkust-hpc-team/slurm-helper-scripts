@@ -206,16 +206,18 @@ def format_output(usage_by_user, total_cost, gpu_limits):
 
 
 def main():
+    print("")
     parser = argparse.ArgumentParser(
         description="Calculate Slurm GPU usage and cost")
-    parser.add_argument("username", nargs='?',
-                        help="Username to check usage for (optional)")
+    parser.add_argument(
+        "-u", "--username", help="Username to check usage for (optional)", default=None)
     parser.add_argument("-S", "--start", help="Start date (YYYY-MM-DD)",
                         default=(datetime.date.today().replace(day=1)).isoformat())
     parser.add_argument("-E", "--end", help="End date (YYYY-MM-DD)",
                         default=datetime.date.today().isoformat())
     parser.add_argument("-A", "--account",
                         help="Specific account to check (optional)")
+
     args = parser.parse_args()
 
     current_user = os.getenv('USER')
@@ -231,6 +233,11 @@ def main():
         if not args.username and not args.account:
             print("Error: As root, you must specify either a username or an account.")
             sys.exit(1)
+        elif not args.username and args.account:
+            # Check all users in the account
+            print(
+                "Warning: Running as root and no user specified. All users in the account will be checked.")
+            args.username = None
 
     end_date = datetime.date.fromisoformat(args.end)
     current_date = datetime.date.today()
@@ -270,6 +277,7 @@ def main():
                 f"  Account {account}: Used: {used_minutes:.0f}, Total: {total_minutes:.0f}")
         else:
             print(f"  Account {account}: N/A")
+    print("")
 
 
 if __name__ == "__main__":
