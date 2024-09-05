@@ -249,7 +249,7 @@ def main():
     print(format_output(usage_by_user, gpu_limits))
 
     # Print account-level GPU limits information
-    print("\nAccount-level GPU Limits:")
+    print("\nAccount-level Usage Limits:")
     for account in all_accounts:
         account_limit = gpu_limits.get(account, {}).get("account")
         if account_limit and account_limit["total"] is not None:
@@ -258,7 +258,7 @@ def main():
             total_hours = float(
                 account_limit["total"]) / 60 if account_limit["total"] else 0
             print(
-                f"  Account {account}: Used: {used_hours:.2f}, Total: {total_hours:.2f}")
+                f"  Account {account}: Used: {used_hours:.2f} Hours, Limit: {total_hours:.2f} Hours")
         else:
             print(f"  Account {account}: N/A")
     print("")

@@ -265,7 +265,7 @@ def main():
     print(format_output(usage_by_user, total_cost, gpu_limits))
 
     # Print account-level GPU limits information
-    print("\nAccount-level GPU Limits:")
+    print("\nAccount-level Usage Limits:")
     for account in all_accounts:
         account_limit = gpu_limits.get(account, {}).get("account")
         if account_limit and account_limit["total"] is not None:
@@ -274,7 +274,7 @@ def main():
             total_minutes = float(
                 account_limit["total"]) if account_limit["total"] else 0
             print(
-                f"  Account {account}: Used: {used_minutes:.0f}, Total: {total_minutes:.0f}")
+                f"  Account {account}: Used: {used_minutes:.2f} Minutes, Limit: {total_minutes:.2f} Minutes")
         else:
             print(f"  Account {account}: N/A")
     print("")
