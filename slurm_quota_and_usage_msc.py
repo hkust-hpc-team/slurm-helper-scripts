@@ -117,7 +117,7 @@ def calculate_gpu_hours(usage_data):
 
 def format_output(usage_by_account, gpu_limits):
     header = "┌────────────────┬─────────────────────────────────┬──────────────────────┐\n"
-    header += "│    Account     │        Partition Details        │  Usage (GPU Hours)   │\n"
+    header += "│    Account     │        Partition Details        │ Usage/Cap (GPU Hours)│\n"
     header += "├────────────────┼─────────────────────────────────┼──────────────────────┤\n"
 
     body = ""
@@ -133,7 +133,8 @@ def format_output(usage_by_account, gpu_limits):
 
         partition_lines = partition_details.split('\n')
 
-        gpu_limit = gpu_limits.get(account, None)
+        gpu_limit = 160.0 if account == "mscbdt2024" else gpu_limits.get(
+            account, None)
         usage_str = f"{data['total']:.2f} / {gpu_limit:.2f}" if gpu_limit is not None else f"{data['total']:.2f}"
 
         body += f"│ {account:<14} │ {partition_lines[0]:<31} │ {usage_str:>20} │\n"
