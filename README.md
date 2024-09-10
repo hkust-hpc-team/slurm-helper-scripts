@@ -33,9 +33,9 @@ python slurm_quota_and_usage_msc.py [-h] [-u USERNAME] [-S START] [-E END] [-A A
 ## Sample Output
 
 ```text
-(base) chtaihei@slogin-01:~/projects/slurm-helper-scripts$ python slurm_quota_and_usage_msc.py
+(base) username@slogin-01:~/slurm-helper-scripts$ python slurm_quota_and_usage_msc.py
 
-Using current user: chtaihei
+Using current user: username
 Warning: Report includes today's date. Some very recent jobs may not be included due to accounting delays.
 For most accurate results, wait a few minutes and run the report again.
 
@@ -43,7 +43,7 @@ GPU Usage report from 2024-09-01 to 2024-09-10
 ┌────────────────┬─────────────────────────────────┬──────────────────────┐
 │    Account     │        Partition Details        │  Usage (GPU Hours)   │
 ├────────────────┼─────────────────────────────────┼──────────────────────┤
-│ itscspod       │ ┌───────────┬───────────────┐   │         0.05 / 30.00 │
+│ username       │ ┌───────────┬───────────────┐   │         0.05 / 30.00 │
 │                │ │ Partition │   GPU Hours   │   │                      │
 │                │ ├───────────┼───────────────┤   │                      │
 │                │ │ normal    │          0.05 │   │                      │
