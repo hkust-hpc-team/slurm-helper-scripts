@@ -134,7 +134,7 @@ def format_output(usage_by_account, gpu_limits):
         partition_lines = partition_details.split('\n')
 
         gpu_limit = gpu_limits.get(account, None)
-        usage_str = f"{data['total']:.2f} / {gpu_limit:.2f}" if gpu_limit is not None else f"{data['total']:.2f} / n/a"
+        usage_str = f"{data['total']:.2f} / {gpu_limit:.2f}" if gpu_limit is not None else f"{data['total']:.2f}"
 
         body += f"│ {account:<14} │ {partition_lines[0]:<31} │ {usage_str:>20} │\n"
 
