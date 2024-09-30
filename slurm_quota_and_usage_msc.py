@@ -36,9 +36,6 @@ def get_usage(start_date, end_date, account=None, username=None):
 def get_gpu_limits(accounts):
     gpu_limits = {}
     for account in accounts:
-        if account == "medimgfmod":
-            gpu_limits[account] = 50000/60
-            continue
         cmd = ["sshare", "-A", account, "-n",
                "-P", "-o", "Account,GrpTRESMins"]
         try:
