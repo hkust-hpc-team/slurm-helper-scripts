@@ -13,7 +13,7 @@ This script generates a report of GPU usage on HKUST SuperPOD for MSc students. 
 
 ## Usage
 ```bash
-python slurm_quota_and_usage_msc.py [-h] [-u USERNAME] [-S START] [-E END] [-A ACCOUNT]
+squota_msc [-h] [-u USERNAME] [-S START] [-E END] [-A ACCOUNT]
 ```
 
 ### Options
@@ -33,7 +33,7 @@ python slurm_quota_and_usage_msc.py [-h] [-u USERNAME] [-S START] [-E END] [-A A
 ## Sample Output
 
 ```text
-(base) username@slogin-01:~/slurm-helper-scripts$ python slurm_quota_and_usage_msc.py
+(base) username@slogin-01:~$ squota_msc
 
 Using current user: username
 Warning: Report includes today's date. Some very recent jobs may not be included due to accounting delays.
@@ -55,9 +55,9 @@ GPU Usage report from 2024-09-01 to 2024-09-10
 
 1. Generate a report for the current user for the current month:
 ```bash
-python slurm_quota_and_usage_msc.py
+squota_msc
 ```
 2. Generate a report for a specific date range:
 ```bash
-python slurm_quota_and_usage_msc.py -S 2024-09-01 -E 2024-09-10
+squota_msc -S 2024-09-01 -E 2024-09-10
 ```
