@@ -33,7 +33,7 @@ squota_msc [-h] [-u USERNAME] [-S START] [-E END] [-A ACCOUNT]
 ## Sample Output
 
 ```text
-(base) username@slogin-01:~$ squota_msc
+username@slogin-01:~$ squota_msc
 
 Using current user: username
 Warning: Report includes today's date. Some very recent jobs may not be included due to accounting delays.
