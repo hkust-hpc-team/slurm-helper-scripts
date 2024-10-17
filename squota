@@ -106,6 +106,9 @@ def format_output(usage_by_account, title=None):
         partition_table.add_column("Partition", alignment='left')
         partition_table.add_column("Hours", alignment='right')
 
+        data["partitions"] = dict(
+            sorted(data["partitions"].items(), key=lambda x: x[1]["hours"], reverse=True))
+
         for partition, usage_data in data["partitions"].items():
             partition_table.add_row(
                 [partition, f"{usage_data['hours']:.2f}"])
