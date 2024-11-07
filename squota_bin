@@ -330,6 +330,7 @@ def main():
 
     title = f"Usage report from {args.start} to {args.end}"
     print(format_output(usage_by_account, title=title))
+    print("Note: \"Hours\" refers to GPU-hour for GPU partitions and CPU-core-hour for CPU partitions.")
 
 
 if __name__ == "__main__":
