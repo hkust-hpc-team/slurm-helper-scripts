@@ -7,14 +7,15 @@ import sys
 import os
 from table import Table
 
-partitions = ["gpu-a30", "gpu-l20", "amd", "intel", "admin"]
+partitions = ["normal", "large", "admin", "preempt", 'buildlam', 'cpu']
 
 pricing = {
     "admin": 0.0,
-    "intel": 0.014,
-    "amd": 0.014,
-    "gpu-a30": 2.13,
-    "gpu-l20": 2.13,
+    "normal": 12.0,
+    "large": 12.0,
+    "preempt": 0.0,
+    "buildlam": 0.0,
+    "cpu": 0.0
 }
 
 
@@ -62,6 +63,9 @@ def calculate_usage(usage_data):
         _, _, elapsed, alloc_tres, partition, account = job_parts
 
         if not partition or not account:
+            continue
+
+        if partition not in partitions:
             continue
 
         hours = parse_time(elapsed)
