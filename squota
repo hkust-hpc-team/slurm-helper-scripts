@@ -96,7 +96,7 @@ def format_output(usage_by_account, title=None):
     print("")
     table = Table(title=title)
     table.add_column("Account", alignment='left')
-    table.add_column("Total (HKD)", alignment='right')
+    # table.add_column("Total (HKD)", alignment='right')
     table.add_column("Partition Details", alignment='left')
 
     for account, data in usage_by_account.items():
@@ -118,9 +118,11 @@ def format_output(usage_by_account, title=None):
                 [partition, f"{usage_data['hours']:.2f}"])
 
         # Add main table row with subtable
-        table.add_row([account, usage_str, ""])
+        # table.add_row([account, usage_str, ""])
+        table.add_row([account, ""])
+
         # Attach the subtable to the last added row
-        table.add_subtable(len(table.rows) - 1, 2, partition_table)
+        table.add_subtable(len(table.rows) - 1, 1, partition_table)
 
     return table.render()
 
