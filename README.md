@@ -2,64 +2,79 @@
 
 ## Overview
 
-This script generates a report of usage by partition on HKUST HPC4. It provides a detailed breakdown of unit hours (core-hour for cpu partitions, gpu-hour for gpu partitions) used by account and partition, for tracking and managing resource utilization.
+This script generates detailed resource utilization reports for HPC clusters using Slurm. Features include:
+
+- Hierarchical organization (Account → User → Partition)
+- Resource limit tracking (usage/capacity)
+- Automatic detection of active partitions
+- Terminal-adaptive formatting
 
 ## Features
 
-- Calculates usage for a specified time period
-- Breaks down usage by partition
-- Supports filtering by date
+- Multi-level reporting (Account > User > Partition)
+- Dynamic partition detection from cluster status
+- Usage cap tracking from Slurm associations
+- Automatic terminal width adjustment
 
 ## Usage
 ```bash
 squota [-h] [-u USERNAME] [-S START] [-E END] [-A ACCOUNT]
 ```
 
-### Options
+### Key Options
 
-- `-h, --help`: Show the help message and exit
-- `-u USERNAME, --username USERNAME`: Username to check usage for (optional)
-- `-S START, --start START`: Start date for the report (YYYY-MM-DD)
-- `-E END, --end END`: End date for the report (YYYY-MM-DD)
-- `-A ACCOUNT, --account ACCOUNT`: Specific account to check (optional)
-
-### Default Behavior
-
-- If no dates are specified, the report will cover the current month (from the 1st to the current date)
-- If no username is specified, it will use the current user
-- Unless granted special permission, the user can only see the usage of itself
+- `-A,--account`: Show specific account usage (admin only)
+- `-S,--start`: Start date (YYYY-MM-DD)
+- `-E,--end`: End date (YYYY-MM-DD)
+- `-u,--username`: Check specific user (admin only)
 
 ## Sample Output
-
 ```text
-bob@login1:~$ squota
-
-Using current user: bob
+(base) bob@bcm2suheadnode-01:~/slurm-helper-scripts$ ./squota -u bob -S 2024-09-01
 Warning: Report includes today's date. Some very recent jobs may not be included due to accounting delays.
 For most accurate results, wait a few minutes and run the report again.
-
-     Usage report from 2024-10-01 to 2024-10-17
-┌─────────┬─────────────┬──────────────────────────┐
-│ Account │ Total (HKD) │    Partition Details     │
-├─────────┼─────────────┼──────────────────────────┤
-│ itsc    │       73.07 │ ┌───────────┬──────────┐ │
-│         │             │ │ Partition │  Hours   │ │
-│         │             │ ├───────────┼──────────┤ │
-│         │             │ │ amd       │  4675.20 │ │
-│         │             │ │ intel     │   528.33 │ │
-│         │             │ │ gpu-l20   │     0.10 │ │
-│         │             │ │ gpu-a30   │     0.01 │ │
-│         │             │ └───────────┴──────────┘ │
-└─────────┴─────────────┴──────────────────────────┘
+                            Usage report from 2024-09-01 to 2025-02-06                            
+┌────────────┬───────────────────────┬───────────────────────────────────────────────────────────┐
+│  Account   │ Account Total (Hours) │                          Details                          │
+├────────────┼───────────────────────┼───────────────────────────────────────────────────────────┤
+│ itscspod   │                 18.75 │ ┌──────────┬────────────────────┬───────────────────────┐ │
+│            │                       │ │   User   │ User Total (Hours) │   Partition Details   │ │
+│            │                       │ ├──────────┼────────────────────┼───────────────────────┤ │
+│            │                       │ │ bob      │              18.75 │ ┌───────────┬───────┐ │ │
+│            │                       │ │          │                    │ │ Partition │ Hours │ │ │
+│            │                       │ │          │                    │ ├───────────┼───────┤ │ │
+│            │                       │ │          │                    │ │ admin     │ 11.57 │ │ │
+│            │                       │ │          │                    │ │ cpu       │  0.02 │ │ │
+│            │                       │ │          │                    │ │ large     │  4.39 │ │ │
+│            │                       │ │          │                    │ │ normal    │  2.76 │ │ │
+│            │                       │ │          │                    │ └───────────┴───────┘ │ │
+│            │                       │ └──────────┴────────────────────┴───────────────────────┘ │
+│ myaccount  │                  0.22 │ ┌──────────┬────────────────────┬───────────────────────┐ │
+│            │                       │ │   User   │ User Total (Hours) │   Partition Details   │ │
+│            │                       │ ├──────────┼────────────────────┼───────────────────────┤ │
+│            │                       │ │ bob      │               0.22 │ ┌───────────┬───────┐ │ │
+│            │                       │ │          │                    │ │ Partition │ Hours │ │ │
+│            │                       │ │          │                    │ ├───────────┼───────┤ │ │
+│            │                       │ │          │                    │ │ normal    │  0.22 │ │ │
+│            │                       │ │          │                    │ └───────────┴───────┘ │ │
+│            │                       │ └──────────┴────────────────────┴───────────────────────┘ │
+│ mscbdt2024 │                  0.15 │ ┌──────────┬────────────────────┬───────────────────────┐ │
+│            │                       │ │   User   │ User Total (Hours) │   Partition Details   │ │
+│            │                       │ ├──────────┼────────────────────┼───────────────────────┤ │
+│            │                       │ │ bob      │               0.15 │ ┌───────────┬───────┐ │ │
+│            │                       │ │          │                    │ │ Partition │ Hours │ │ │
+│            │                       │ │          │                    │ ├───────────┼───────┤ │ │
+│            │                       │ │          │                    │ │ normal    │  0.15 │ │ │
+│            │                       │ │          │                    │ └───────────┴───────┘ │ │
+│            │                       │ └──────────┴────────────────────┴───────────────────────┘ │
+└────────────┴───────────────────────┴───────────────────────────────────────────────────────────┘
+Note: "Hours" refers to GPU-hour for GPU partitions and CPU-core-hour for CPU partitions.
 ```
 
-## Examples
-
-1. Generate a report for the current user for the current month:
+## Installation
 ```bash
-squota
+sudo ./install.sh
 ```
-2. Generate a report for a specific date range:
-```bash
-squota -S 2024-09-01 -E 2024-09-10
-```
+
+## License
+MIT Licensed - See LICENSE file
