@@ -27,26 +27,30 @@ class Table:
 
     def _calculate_column_widths(self):
         terminal_width = shutil.get_terminal_size((80, 20)).columns
-        available_width = terminal_width - (3 * len(self.columns) + 1)  # Account for borders
+        available_width = terminal_width - \
+            (3 * len(self.columns) + 1)  # Account for borders
 
         def calc_widths(table, avail_width):
             col_widths = [len(str(col)) for col in table.columns]
-            
+
             for row in table.rows:
                 for idx, cell in enumerate(row):
                     content = str(cell)
                     if (table.rows.index(row), idx) in table.subtables:
-                        subtable = table.subtables[(table.rows.index(row), idx)]
+                        subtable = table.subtables[(
+                            table.rows.index(row), idx)]
                         sub_widths = calc_widths(subtable, avail_width)
-                        col_widths[idx] = max(col_widths[idx], sum(sub_widths) + 3 * len(sub_widths) + 1)
+                        col_widths[idx] = max(col_widths[idx], sum(
+                            sub_widths) + 3 * len(sub_widths) + 1)
                     else:
                         col_widths[idx] = max(col_widths[idx], len(content))
-            
+
             total_width = sum(col_widths)
             if total_width > avail_width:
                 scale_factor = avail_width / total_width
-                col_widths = [max(math.floor(w * scale_factor), 3) for w in col_widths]
-            
+                col_widths = [max(math.floor(w * scale_factor), 3)
+                              for w in col_widths]
+
             return col_widths
 
         return calc_widths(self, available_width)
