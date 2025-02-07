@@ -1,236 +1,12 @@
 #!/usr/bin/env python3
-import subprocess
-import datetime
 import argparse
-import sys
+import datetime
 import os
-from table import Table
+import sys
 
-# partitions will be determined dynamically
-
-
-def get_avail_partitions():
-    cmd = ["sinfo", "--noheader", "--format=%P"]
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True)
-        return result.stdout.strip().split('\n')
-    except subprocess.CalledProcessError as e:
-        print(f"Error getting partitions: {e}")
-        return []
-
-
-def get_association_data(account=None, user=None):
-    cmd = [
-        "sacctmgr", "show", "association", "--parsable", "--noheader",
-        "format=Account,User,Partition,GrpTRESMins", "--readonly"
-    ]
-    if account:
-        cmd.append(f"account={account}")
-    if user:
-        cmd.append(f"user={user}")
-
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True)
-        associations = []
-        for line in result.stdout.strip().split('\n'):
-            if line:
-                parts = line.split('|')
-                assoc = {
-                    'account': parts[0],
-                    'user': parts[1],
-                    'partition': parts[2],
-                    'tres_mins': parts[3]
-                }
-                associations.append(assoc)
-        return associations
-    except subprocess.CalledProcessError as e:
-        print(f"Error getting association data: {e}")
-        return []
-
-
-def parse_tres(tres_str):
-    if not tres_str:
-        return {}
-    tres_dict = {}
-    for item in tres_str.split(','):
-        if '=' in item:
-            key, value = item.split('=')
-            tres_dict[key] = int(value)
-    return tres_dict
-
-
-def get_usage_rawdata(start_date, end_date, account=None, username=None) -> list:
-    cmd = [
-        "sacct", "-n", "-P", "-X",
-        "-S", start_date,
-        "-E", end_date,
-        "--format=JobID,User,ElapsedRaw,AllocTRES,Partition,Account",
-        "--truncate",
-        "--allusers",
-    ]
-    if account:
-        cmd.extend(["-A", account])
-    if username:
-        cmd.extend(["-u", username])
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True)
-        return result.stdout.strip().split('\n')
-    except subprocess.CalledProcessError as e:
-        print(f"Error running sacct command: {e}")
-        return []
-
-
-def parse_time(time_str_in_second):
-    time_str_in_second = int(time_str_in_second)
-    return time_str_in_second / 3600  # Convert to hours
-
-
-def calculate_usage(usage_data, associations):
-    usage_by_account = {}
-    account_limits = {}
-
-    # --- First, initialize the structure using association data
-    for assoc in associations:
-        account = assoc['account']
-        user = assoc['user'] if assoc['user'] else None
-        partition = assoc['partition'] if assoc['partition'] else None
-        tres = parse_tres(assoc['tres_mins'])
-
-        # Handle account-level limits (if no user is defined)
-        if not user:
-            for part in partitions:
-                if 'gres/gpu' in tres:
-                    account_limits.setdefault(account, {})[
-                        part] = tres.get('gres/gpu', 0) / 60
-            continue
-
-        if account not in usage_by_account:
-            usage_by_account[account] = {'users': {}}
-        # Always add the user even if no job record will follow
-        if user not in usage_by_account[account]['users']:
-            usage_by_account[account]['users'][user] = {
-                'partitions': {}, 'limits': {}}
-        # Record user-partition limits (if any)
-        if partition and partition in partitions:
-            usage_by_account[account]['users'][user]['limits'][partition] = {
-                'gpu_limit': tres.get('gres/gpu', 0) / 60,
-                'cpu_limit': tres.get('cpu', 0) / 60
-            }
-
-    # --- Now accumulate usage from sacct job data
-    for job in usage_data:
-        if not job:
-            continue
-        job_parts = job.split('|')
-        if len(job_parts) < 6:
-            continue
-        _, user, elapsed, alloc_tres, partition, account = job_parts
-
-        if not partition or not account or not user:
-            continue
-        if partition not in partitions:
-            continue
-
-        # Ensure the account/user exists (even if not present prior)
-        if account not in usage_by_account:
-            usage_by_account[account] = {'users': {}}
-        if user not in usage_by_account[account]['users']:
-            usage_by_account[account]['users'][user] = {
-                'partitions': {}, 'limits': {}}
-
-        hours = parse_time(elapsed)
-        gpus = next((int(item.split('=')[1]) for item in alloc_tres.split(',')
-                     if item.startswith('gres/gpu=')), 0)
-        cpus = next((int(item.split('=')[1]) for item in alloc_tres.split(',')
-                     if item.startswith('cpu=')), 1)
-        resource_hours = hours * gpus if gpus > 0 else hours * cpus
-
-        user_entry = usage_by_account[account]['users'][user]
-        if partition not in user_entry['partitions']:
-            user_entry['partitions'][partition] = {'hours': 0.0}
-        user_entry['partitions'][partition]['hours'] += resource_hours
-
-    # --- Finally, make sure each user has an entry for every allowed partition
-    for account, account_data in usage_by_account.items():
-        for user, user_data in account_data['users'].items():
-            allowed_partitions = [
-                assoc['partition'] for assoc in associations
-                if assoc['account'] == account and assoc['user'] == user and assoc['partition']
-            ]
-            for partition in allowed_partitions:
-                if partition not in user_data['partitions']:
-                    user_data['partitions'][partition] = {'hours': 0.0}
-
-    return usage_by_account, account_limits
-
-
-def format_output(usage_by_account, account_limits, title=None):
-    table = Table(title=title)
-    table.add_column("Account", alignment='left')
-    table.add_column("Account Total (Hours)", alignment='right')
-    table.add_column("Details", alignment='left')
-
-    for account, account_data in usage_by_account.items():
-        account_total = 0.0
-        # Instead of filtering out users with zero usage, include every user from association.
-        valid_users = []
-        for user, user_data in account_data['users'].items():
-            user_total = sum(p['hours']
-                             for p in user_data['partitions'].values())
-            valid_users.append((user, user_data))
-            account_total += user_total
-
-        # If there are no users at all, skip this account.
-        if not valid_users:
-            continue
-
-        account_limit = sum(account_limits.get(account, {}).values())
-        account_total_str = f"{account_total:.2f}"
-        if account_limit > 0:
-            account_total_str += f" / {account_limit:.2f}"
-
-        # Build the second-level (User) subtable.
-        details_table = Table()
-        details_table.add_column("User", alignment='left')
-        details_table.add_column("User Total (Hours)", alignment='right')
-        details_table.add_column("Partition Details", alignment='left')
-
-        for user, user_data in sorted(valid_users, key=lambda x: x[0]):
-            user_total = sum(p['hours']
-                             for p in user_data['partitions'].values())
-            user_limit = 0.0
-            for p_limit in user_data['limits'].values():
-                user_limit += max(p_limit.get('gpu_limit', 0),
-                                  p_limit.get('cpu_limit', 0))
-            user_total_str = f"{user_total:.2f}"
-            if user_limit > 0:
-                user_total_str += f" / {user_limit:.2f}"
-
-            # Build the third-level (Partition) subtable.
-            partition_table = Table()
-            partition_table.add_column("Partition", alignment='left')
-            partition_table.add_column("Hours", alignment='right')
-            sorted_partitions = sorted(
-                user_data['partitions'].items(), key=lambda x: x[0])
-            for partition, p_data in sorted_partitions:
-                p_limit = user_data['limits'].get(partition, {})
-                limit = max(p_limit.get('gpu_limit', 0),
-                            p_limit.get('cpu_limit', 0))
-                limit_str = f" / {limit:.2f}" if limit > 0 else ""
-                partition_table.add_row(
-                    [partition, f"{p_data['hours']:.2f}{limit_str}"])
-
-            details_table.add_row([user, user_total_str, ""])
-            details_table.add_subtable(
-                len(details_table.rows)-1, 2, partition_table)
-
-        table.add_row([account, account_total_str, ""])
-        table.add_subtable(len(table.rows)-1, 2, details_table)
-
-    return table.render()
+from slurm_client import get_available_partitions, get_association_data, get_usage_data
+from usage_calculator import calculate_usage
+from report_renderer import render_report
 
 
 def main():
@@ -250,10 +26,9 @@ def main():
     args = parser.parse_args()
 
     current_user = os.getenv('USER')
-    if current_user == 'root':
-        if not args.username and not args.account:
-            print("Error: As root, you must specify either a username or an account.")
-            sys.exit(1)
+    if current_user == 'root' and not (args.username or args.account):
+        print("Error: As root, you must specify either a username or an account.")
+        sys.exit(1)
 
     end_date = datetime.date.fromisoformat(args.end)
     current_date = datetime.date.today()
@@ -261,26 +36,23 @@ def main():
         print("Warning: Report includes today's date. Some very recent jobs may not be included due to accounting delays.")
         print("For most accurate results, wait a few minutes and run the report again.")
 
+    # Add a buffer to the end date.
     end_date_with_buffer = (datetime.datetime.combine(end_date, datetime.time.max) +
                             datetime.timedelta(minutes=15)).date()
 
-    global partitions
-    partitions = get_avail_partitions()
-
-    # Get association data first (this list determines the "seeable" users)
+    partitions = get_available_partitions()
     associations = get_association_data(args.account, args.username)
-    # Get usage (job) data
-    usage_data = get_usage_rawdata(
+    usage_data = get_usage_data(
         args.start, end_date_with_buffer.isoformat(), args.account, args.username)
     usage_by_account, account_limits = calculate_usage(
-        usage_data, associations)
+        usage_data, associations, partitions)
 
     if not usage_by_account:
         print("No usage data found for the specified criteria.")
         sys.exit(0)
 
     title = f"Usage report from {args.start} to {args.end}"
-    print(format_output(usage_by_account, account_limits, title=title))
+    print(render_report(usage_by_account, account_limits, title))
     print('Note: "Hours" refers to GPU-hour for GPU partitions and CPU-core-hour for CPU partitions.')
 
 
