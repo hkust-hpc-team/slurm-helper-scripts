@@ -7,8 +7,10 @@ class Table:
         self.title = title
         self.columns = []
         self.rows = []
-        self.subtables = {}  # {(row_idx, col_idx): subtable}
+        self.subtables = {}
         self.alignments = {}
+        self.GREY = '\033[90m'
+        self.RESET = '\033[0m'
 
     def set_title(self, title):
         self.title = title

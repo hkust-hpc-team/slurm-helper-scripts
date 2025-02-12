@@ -7,6 +7,14 @@ import sys
 from slurm_client import get_available_partitions, get_association_data, get_usage_data
 from usage_calculator import calculate_usage
 from report_renderer import render_report
+from utils import get_cluster
+
+# Define color codes
+RED = '\033[91m'
+GREEN = '\033[92m'
+BLUE = '\033[94m'
+YELLOW = '\033[93m'
+RESET = '\033[0m'
 
 
 def main():
@@ -31,12 +39,7 @@ def main():
         sys.exit(1)
 
     end_date = datetime.date.fromisoformat(args.end)
-    current_date = datetime.date.today()
-    if end_date == current_date:
-        print("Warning: Report includes today's date. Some very recent jobs may not be included due to accounting delays.")
-        print("For most accurate results, wait a few minutes and run the report again.")
 
-    # Add a buffer to the end date.
     end_date_with_buffer = (datetime.datetime.combine(end_date, datetime.time.max) +
                             datetime.timedelta(minutes=15)).date()
 
@@ -48,12 +51,19 @@ def main():
         usage_data, associations, partitions)
 
     if not usage_by_account:
-        print("No usage data found for the specified criteria.")
+        print(f"{RED}No usage data found for the specified criteria.{RESET}")
         sys.exit(0)
 
-    title = f"Usage report from {args.start} to {args.end}"
+    title = f"\n{GREEN}Usage report from {BLUE}{args.start}{GREEN} to {BLUE}{args.end}{RESET}"
     print(render_report(usage_by_account, account_limits, title))
-    print('Note: "Hours" refers to GPU-hour for GPU partitions and CPU-core-hour for CPU partitions.')
+
+    # Determine cluster and set note
+
+    cluster = get_cluster()
+    if cluster == 'superpod':
+        print(f'{YELLOW}Note: "Hours" refers to {RED}GPU-hour{YELLOW} for GPU partitions and {RED}CPU-core-hour{YELLOW} for CPU partitions.\nTo convert {RED}GPU-hour{YELLOW} to {RED}GPU-node-hour{YELLOW}, divide {RED}GPU-hour{YELLOW} by 8.{RESET}')
+    else:
+        print(f'{YELLOW}Note: "Hours" refers to {RED}GPU-hour{YELLOW} for GPU partitions and {RED}CPU-core-hour{YELLOW} for CPU partitions.{RESET}')
 
 
 if __name__ == "__main__":
