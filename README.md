@@ -2,19 +2,12 @@
 
 ## Overview
 
-This script generates detailed resource utilization reports for HPC clusters using Slurm. Features include:
-
-- Hierarchical organization (Account → User → Partition)
-- Resource limit tracking (usage/capacity)
-- Automatic detection of active partitions
-- Terminal-adaptive formatting
+This script generates detailed resource utilization reports for HPC clusters using Slurm. 
 
 ## Features
 
 - Multi-level reporting (Account > User > Partition)
-- Dynamic partition detection from cluster status
 - Usage cap tracking from Slurm associations
-- Automatic terminal width adjustment
 
 ## Usage
 ```bash
@@ -23,17 +16,16 @@ squota [-h] [-u USERNAME] [-S START] [-E END] [-A ACCOUNT]
 
 ### Key Options
 
-- `-A,--account`: Show specific account usage (admin only)
+- `-A,--account`: Show specific account usage
 - `-S,--start`: Start date (YYYY-MM-DD)
 - `-E,--end`: End date (YYYY-MM-DD)
-- `-u,--username`: Check specific user (admin only)
+- `-u,--username`: Check specific user
 
-## Sample Output
+## Sample Output after installation
 ```text
-(base) bob@bcm2suheadnode-01:~/slurm-helper-scripts$ ./squota -u bob -S 2024-09-01
-Warning: Report includes today's date. Some very recent jobs may not be included due to accounting delays.
-For most accurate results, wait a few minutes and run the report again.
-                            Usage report from 2024-09-01 to 2025-02-06                            
+(base) bob@slogin-01:~$squota -u bob -S 2024-09-01
+
+Usage report from 2024-09-01 to 2025-02-06                            
 ┌────────────┬───────────────────────┬───────────────────────────────────────────────────────────┐
 │  Account   │ Account Total (Hours) │                          Details                          │
 ├────────────┼───────────────────────┼───────────────────────────────────────────────────────────┤
@@ -69,6 +61,7 @@ For most accurate results, wait a few minutes and run the report again.
 │            │                       │ └──────────┴────────────────────┴───────────────────────┘ │
 └────────────┴───────────────────────┴───────────────────────────────────────────────────────────┘
 Note: "Hours" refers to GPU-hour for GPU partitions and CPU-core-hour for CPU partitions.
+To convert GPU-hour to GPU-node-hour, divide GPU-hour by 8.
 ```
 
 ## Installation
