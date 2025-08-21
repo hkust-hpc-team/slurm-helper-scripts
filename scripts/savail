@@ -1,0 +1,174 @@
+#!/bin/bash
+
+# This script displays a resource summary for all nodes within a specified partition.
+# Features:
+#   - Dynamic column widths for clean layout.
+#   - Consistent alignment for resource separators ('/') matching the header.
+#   - ANSI color-coding for node state (different colors for DRAIN, DOWN, INVALID separately) and resource availability.
+#   - Option to sort by: gpu (default, descending avail%), cpu (descending avail%), or node (alphabetical).
+#   - If not sorting by node, DRAIN/DOWN/INVALID nodes are moved to the bottom.
+#   - Option to show unavailable nodes (DRAIN/DOWN/INVALID) (default: hide them).
+#
+# Usage: ./savail -p <partition> [--sort=gpu|cpu|node] [--show-unavail]
+
+PARTITION=""
+SORT_BY="gpu"      # gpu | cpu | node
+SHOW_UNAVAIL=0     # 0 = hide DRAIN/DOWN/INVALID, 1 = show
+
+error_usage() {
+    echo "Usage: $0 -p <partition(s)> [--sort=gpu|cpu|node] [--show-unavail]"
+    exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -p|--partition)
+            [[ -n "$2" ]] || { echo "Error: Missing partition after $1"; error_usage; }
+            PARTITION="$2"
+            shift 2
+            ;;
+        --sort=*)
+            SORT_BY="${1#*=}"
+            shift
+            ;;
+        --sort)
+            [[ -n "$2" ]] || { echo "Error: Missing value after --sort"; error_usage; }
+            SORT_BY="$2"
+            shift 2
+            ;;
+        --show-unavail)
+            SHOW_UNAVAIL=1
+            shift
+            ;;
+        -h|--help)
+            error_usage
+            ;;
+        *)
+            echo "Error: Unknown argument '$1'"
+            error_usage
+            ;;
+    esac
+done
+
+if [[ -z "$PARTITION" ]]; then
+    echo "Error: Partition not specified."
+    error_usage
+fi
+
+if [[ ! "$SORT_BY" =~ ^(gpu|cpu|node)$ ]]; then
+    echo "Error: Invalid --sort value. Use gpu, cpu, or node."
+    error_usage
+fi
+
+COMPRESSED_NODELIST=$(sinfo -h -p "$PARTITION" -o "%N")
+if [ -z "$COMPRESSED_NODELIST" ]; then
+    echo "Error: Partition '$PARTITION' not found or contains no nodes."
+    exit 1
+fi
+
+EXPANDED_NODELIST=$(scontrol show hostnames "$COMPRESSED_NODELIST" | paste -s -d,)
+
+AWK_SCRIPT='
+BEGIN {
+    RS = ""
+    RED="\033[31m"; YELLOW="\033[33m"; GREEN="\033[32m"; MAGENTA="\033[35m"; CYAN="\033[36m"; ORANGE="\033[38;5;208m"; NC="\033[0m";
+    split(nodelist, nodes_arr, ",")
+    for (i in nodes_arr) target_nodes[nodes_arr[i]] = 1
+    node_count = 0
+}
+{
+    nodeName = "UNKNOWN"
+    for (i=1; i<=NF; i++) if ($i ~ /^NodeName=/) { sub(/^NodeName=/,"",$i); nodeName=$i; break }
+    if (!(nodeName in target_nodes)) next
+
+    cpuTot=cpuAlloc=gpuTot=gpuAlloc=0; state="N/A"
+    for (i=1;i<=NF;i++) {
+        if ($i ~ /^State=/) { sub(/^State=/,"",$i); state=$i }
+        if ($i ~ /^CPUTot=/) { sub(/^CPUTot=/,"",$i); cpuTot=$i+0 }
+        if ($i ~ /^CPUAlloc=/) { sub(/^CPUAlloc=/,"",$i); cpuAlloc=$i+0 }
+        if ($i ~ /^CfgTRES=/) if (match($i,/gres\/gpu=([0-9]+)/)) gpuTot=substr($i,RSTART+9,RLENGTH-9)+0
+        if ($i ~ /^AllocTRES=/) if (match($i,/gres\/gpu=([0-9]+)/)) gpuAlloc=substr($i,RSTART+9,RLENGTH-9)+0
+    }
+
+    availCpu = cpuTot - cpuAlloc
+    availGpu = gpuTot - gpuAlloc
+    percentCpu = (cpuTot>0)?availCpu/cpuTot:0
+    percentGpu = (gpuTot>0)?availGpu/gpuTot:0
+
+    is_bad = (state ~ /DRAIN|DOWN|INVALID/)?1:0
+    if (hide_bad && is_bad) next
+
+    colored_state=""
+    split(state, state_parts, "+")
+    for (p in state_parts) {
+        part=state_parts[p]; c=NC
+        if (part ~ /^IDLE$/) c=GREEN
+        else if (part ~ /^MIXED$/) c=YELLOW
+        else if (part ~ /^ALLOCATED$/) c=RED
+        else if (part ~ /^DRAIN$/) c=MAGENTA
+        else if (part ~ /^DOWN$/) c=RED
+        else if (part ~ /^INVALID/) c=CYAN
+        if (colored_state!="") colored_state=colored_state "+"
+        colored_state = colored_state c part NC
+    }
+
+    cpu_color=NC
+    if (cpuTot>0) {
+        if (percentCpu==0) cpu_color=RED
+        else if (percentCpu==1) cpu_color=GREEN
+        else cpu_color=YELLOW
+    }
+    gpu_color=NC
+    if (gpuTot>0) {
+        if (percentGpu==0) gpu_color=RED
+        else if (percentGpu==1) gpu_color=GREEN
+        else gpu_color=YELLOW
+    }
+
+    cpuString=sprintf("%9d/%-8d", availCpu, cpuTot)
+    gpuString=sprintf("%9d/%-8d", availGpu, gpuTot)
+    colored_cpu=cpu_color cpuString NC
+    colored_gpu=gpu_color gpuString NC
+
+    node_count++
+    nodes[node_count]=nodeName "\t" colored_state "\t" colored_cpu "\t" colored_gpu
+    sort_key[node_count]=(sort_by=="node")?nodeName:(sort_by=="cpu")?sprintf("%f",percentCpu):sprintf("%f",percentGpu)
+    bad_flag[node_count]=is_bad
+    name_key[node_count]=nodeName
+}
+END {
+    for (i=1;i<=node_count;i++) {
+        for (j=i+1;j<=node_count;j++) {
+            swap=0
+            if (sort_by!="node") {
+                if (bad_flag[i] < bad_flag[j]) continue
+                if (bad_flag[i] > bad_flag[j]) swap=1
+                else if (sort_key[i] < sort_key[j]) swap=1
+                else if (sort_key[i]==sort_key[j] && name_key[i] > name_key[j]) swap=1
+            } else {
+                if (name_key[i] > name_key[j]) swap=1
+            }
+            if (swap) {
+                temp=nodes[i]; nodes[i]=nodes[j]; nodes[j]=temp
+                temp=sort_key[i]; sort_key[i]=sort_key[j]; sort_key[j]=temp
+                temp=bad_flag[i]; bad_flag[i]=bad_flag[j]; bad_flag[j]=temp
+                temp=name_key[i]; name_key[i]=name_key[j]; name_key[j]=temp
+            }
+        }
+    }
+    print "Node\tState\tAvailable/TotalCPU\tAvailable/TotalGPU"
+    for (i=1;i<=node_count;i++) print nodes[i]
+}
+'
+
+TABLE_DATA=$(scontrol show node | awk -v nodelist="$EXPANDED_NODELIST" -v sort_by="$SORT_BY" -v hide_bad="$((1 - SHOW_UNAVAIL))" "$AWK_SCRIPT")
+FORMATTED_OUTPUT=$(echo "$TABLE_DATA" | column -t -s $'\t')
+
+if [ -n "$FORMATTED_OUTPUT" ]; then
+    HEADER=$(echo "$FORMATTED_OUTPUT" | head -n 1)
+    echo -e "$HEADER"
+    SEPARATOR=$(echo "$HEADER" | sed 's/./-/g')
+    echo -e "$SEPARATOR"
+    BODY=$(echo "$FORMATTED_OUTPUT" | tail -n +2)
+    echo -e "$BODY"
+fi
