@@ -1,4 +1,4 @@
-from table import Table
+from .table import Table
 
 
 def render_report(usage_by_account, account_limits, title):
