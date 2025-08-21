@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slurm-helper-scripts"
+version = "1.1.0"
+description = "Tools to generate Slurm resource utilization reports and check node availability."
+authors = [
+    { name = "Chuen Hei TAI", email = "chtaihei@ust.hk" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+squota = "squota_reporter.main:run"
+
+[tool.setuptools.packages.find]
+where = ["src"] 
+namespaces = false
+
+[tool.setuptools]
+script-files = ["scripts/savail"]
