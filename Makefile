@@ -13,7 +13,7 @@
 #   PREFIX=/usr/local         # or /usr
 #   PYTHON_BIN=/usr/bin/python3
 #   WHEEL=dist/...whl         # default: latest matching wheel in dist/
-#   SUDO=sudo                 # set to empty if already root
+#   SUDO=sudo                 # set to empty if already root (SUDO=)
 
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -euo pipefail -c
@@ -22,7 +22,7 @@ NAME        := slurm-helper-scripts
 BINS        := squota savail
 PREFIX      ?= /usr/local
 PYTHON_BIN  ?= /usr/bin/python3
-SUDO        ?= 
+SUDO        ?= sudo
 
 LIBBASE     := $(PREFIX)/lib/$(NAME)
 VENV        := $(LIBBASE)/venv
@@ -31,7 +31,7 @@ BINDIR      := $(PREFIX)/bin
 # Pick the newest prebuilt wheel by default (py3-none-any)
 WHEEL ?= $(shell ls -1t dist/slurm_helper_scripts-*-py3-none-any*.whl 2>/dev/null | head -n1)
 
-.PHONY: help build install upgrade uninstall status wheel-path ensure-venv
+.PHONY: help build install upgrade uninstall status wheel-path ensure-venv fix-perms
 
 help:
 	@echo "Targets:"
@@ -66,7 +66,7 @@ install upgrade: ensure-venv wheel-path
 	@echo "    VENV        : $(VENV)"
 	@echo "    BINDIR      : $(BINDIR)"
 	@echo "    WHEEL       : $(WHEEL)"
-	$(SUDO) mkdir -p "$(LIBBASE)" "$(BINDIR)"
+	$(SUDO) install -d -m 0755 "$(LIBBASE)" "$(BINDIR)"
 	@if [[ ! -x "$(VENV)/bin/python" ]]; then \
 	  $(SUDO) "$(PYTHON_BIN)" -m venv "$(VENV)"; \
 	else \
@@ -75,9 +75,12 @@ install upgrade: ensure-venv wheel-path
 	$(SUDO) "$(VENV)/bin/python" -m pip install --upgrade pip
 	$(SUDO) "$(VENV)/bin/python" -m pip install --no-deps --no-compile --upgrade "$(WHEEL)"
 
+	@echo "==> Fixing permissions (world-readable/executable for traversal)"
+	$(SUDO) chmod -R a+rX "$(VENV)"
+
 	@echo "==> Linking entrypoints into $(BINDIR)"
 	@for b in $(BINS); do \
-	  $(SUDO) ln -sf "$(VENV)/bin/$$b" "$(BINDIR)/$$b"; \
+	  $(SUDO) ln -sfn "$(VENV)/bin/$$b" "$(BINDIR)/$$b"; \
 	  echo "    -> $(BINDIR)/$$b -> $(VENV)/bin/$$b"; \
 	done
 	@echo "==> Done. Try: $(BINDIR)/squota --help ; $(BINDIR)/savail --help"
@@ -106,9 +109,13 @@ status:
 	@([[ -x "$(VENV)/bin/python" ]] && $(VENV)/bin/python -V || echo "venv python: (missing)")
 	@echo "--- entrypoints ---"
 	@for b in $(BINS); do \
-	  if [[ -x "$(BINDIR)/$$b" ]]; then \
-	    echo "$$b -> $$(readlink -f "$(BINDIR)/$$b")"; \
+	  if [[ -x "$(BINDIR)/$$b" || -L "$(BINDIR)/$$b" ]]; then \
+	    echo "$$b -> $$(readlink -f "$(BINDIR)/$$b" 2>/dev/null || echo "$(BINDIR)/$$b")"; \
 	  else \
 	    echo "$$b (not installed)"; \
 	  fi; \
 	done
+
+# Optional target if you ever need to re-fix permissions post-install
+fix-perms:
+	$(SUDO) chmod -R a+rX "$(VENV)"
