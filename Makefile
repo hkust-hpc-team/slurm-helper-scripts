@@ -23,6 +23,9 @@ BINS        := squota savail
 PREFIX      ?= /usr/local
 PYTHON_BIN  ?= /usr/bin/python3
 SUDO        ?= sudo
+ifeq ($(shell id -u),0)
+SUDO        :=
+endif
 
 LIBBASE     := $(PREFIX)/lib/$(NAME)
 VENV        := $(LIBBASE)/venv
