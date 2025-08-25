@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "slurm-helper-scripts"
 version = "1.1.0"
@@ -9,7 +5,8 @@ description = "Tools to generate Slurm resource utilization reports and check no
 authors = [
     { name = "Chuen Hei TAI", email = "chtaihei@ust.hk" },
 ]
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
@@ -18,6 +15,10 @@ dependencies = []
 squota = "slurm_helper_scripts.main:run"
 savail = "slurm_helper_scripts.savail:run"
 
+[build-system]
+requires = ["setuptools>=77.0"] 
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools.packages.find]
-where = ["src"] 
+where = ["src"]
 namespaces = false

@@ -67,93 +67,70 @@ gpu16  MIXED         48/64                3/4
 
 ## Installation & Deployment
 
-This project uses `uv` and `setuptools`. The deployment process involves two main stages: **Development/Build** on a head node and **Installation** on login nodes.
+This project ships platform packages built with fpm. Build once from source to produce .deb and .rpm, then install them with your system’s package manager.
 
 ### Prerequisites
 
-- A Python version >= 3.9.
-- `uv` installed. If not present, you can install it via:
-  ```bash
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  ```
+- Python ≥ 3.9 is available on the build host.
+- Ruby fpm installed on the build host:
+  - Debian/Ubuntu: `sudo apt-get install ruby-dev gcc make && sudo gem install --no-document fpm`
+  - RHEL/Rocky/CentOS: `sudo dnf install ruby-devel gcc make rpm-build && sudo gem install --no-document fpm`
 
-### Stage 1: Development and Building (On a Head Node or Build Environment)
+### Build (on a build host)
 
-These steps are for developers or administrators who need to modify the code or build the installation package.
+1) Clone and prepare
+```bash
+git clone <your-repo-url>
+cd slurm-helper-scripts
+```
 
-1.  **Clone the Repository**
-    ```bash
-    git clone <your-repo-url>
-    cd slurm-helper-scripts
-    ```
+2) Build the wheel
+```bash
+uv build
+# Produces: dist/slurm_helper_scripts-<VERSION>-py3-none-any.whl
+```
 
-2.  **Set up the Development Environment**
-    ```bash
-    uv sync
-    ```
+3) Package into .deb and .rpm using the provided script
+```bash
+# Ensure the script is executable
+chmod +x scripts/build_pkgs.sh
+# Build packages (uses /usr/bin/python3 and installs under /usr/local)
+./scripts/build_pkgs.sh
+# Outputs: ./slurm-helper-scripts-<VERSION>-1.noarch.rpm and ./slurm-helper-scripts_<VERSION>_all.deb
+```
 
-3.  **Run Tools for Testing**
-    You can now run `squota` and `savail` directly within the development environment using `uv run`.
+Notes:
+- The script forces /usr/bin/python3 and shebangs to avoid venv/conda bleed-through.
+- Architecture is set via fpm’s `-a all` (per fpm docs), resulting in `all` for deb and `noarch` for rpm.
 
-    *   **Running `squota`**:
-        ```bash
-        uv run squota --help
-        uv run squota -u <username>
-        ```
+### Install (on target nodes)
 
-    *   **Running `savail`**:
-        ```bash
-        uv run savail -p cpu
-        ```
+- RPM-based (RHEL/Rocky/CentOS):
+```bash
+sudo dnf install ./slurm-helper-scripts-<VERSION>-1.noarch.rpm
+```
 
-4.  **Build the Distribution Package**
-    Once development and testing are complete, build the distributable wheel (`.whl`) file. This command packages everything into a single file for easy installation.
-    ```bash
-    uv build
-    ```
-    This will create a `.whl` file in the `dist/` directory, for example: `dist/slurm_helper_scripts-1.1.0-py3-none-any.whl`. This is the file you will deploy.
+- DEB-based (Debian/Ubuntu):
+```bash
+sudo apt install ./slurm-helper-scripts_<VERSION>_all.deb
+```
 
-### Stage 2: System-Wide Installation (On Login Nodes)
+After installation, the commands are available system-wide:
+```bash
+squota --help
+savail --help
+```
 
-These steps are for deploying the tools to make them available to all users on the login nodes. **This typically requires `sudo` privileges.**
+### Upgrade / Uninstall
 
-1.  **Copy the Wheel File to a Shared Location**
-    Place the `.whl` file from the `dist/` directory onto a shared filesystem that all login nodes can access.
-    ```bash
-    # Example:
-    cp dist/slurm_helper_scripts-1.1.0-py3-none-any.whl /path/to/shared/packages/
-    ```
+- Upgrade:
+  - Build a new wheel and re-run `./scripts/build_pkgs.sh`, then:
+    - RPM: `sudo dnf upgrade ./slurm-helper-scripts-<NEWVER>-1.noarch.rpm`
+    - DEB: `sudo apt install ./slurm-helper-scripts_<NEWVER>_all.deb`
 
-2.  **Install on Each Login Node**
-    Log in to **each login node** and run the following command to perform a system-wide installation.
-
-    *   **Using `uv` (Recommended)**:
-        ```bash
-        sudo uv pip install /path/to/shared/packages/slurm_helper_scripts-1.1.0-py3-none-any.whl
-        ```
-
-    *   **Using `pip` (If `uv` is not installed on login nodes)**:
-        ```bash
-        sudo pip3 install /path/to/shared/packages/slurm_helper_scripts-1.1.0-py3-none-any.whl
-        ```
-    After installation, the `squota` and `savail` commands will be available in the system's standard path (e.g., `/usr/local/bin`) for all users.
-
-3.  **Verify the Installation**
-    On any login node, users should now be able to run the commands directly:
-    ```bash
-    squota -h
-    savail -h
-    ```
-
-### Upgrading or Uninstalling
-
--   **To upgrade**, build the new version (e.g., `1.2.0`), copy the new `.whl` file, and re-run the `sudo uv pip install --upgrade ...` command on each login node.
--   **To uninstall**, run the following command on each login node:
-    ```bash
-    sudo uv pip uninstall slurm-helper-scripts
-    ```
-
----
+- Uninstall:
+  - RPM: `sudo dnf remove slurm-helper-scripts`
+  - DEB: `sudo apt remove slurm-helper-scripts`
 
 ## License
 
