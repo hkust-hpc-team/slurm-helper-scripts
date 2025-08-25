@@ -15,11 +15,9 @@ requires-python = ">=3.9"
 dependencies = []
 
 [project.scripts]
-squota = "squota_reporter.main:run"
+squota = "slurm_helper_scripts.main:run"
+savail = "slurm_helper_scripts.savail:run"
 
 [tool.setuptools.packages.find]
 where = ["src"] 
 namespaces = false
-
-[tool.setuptools]
-script-files = ["scripts/savail"]
