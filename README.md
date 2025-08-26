@@ -67,16 +67,17 @@ gpu16  MIXED         48/64                3/4
 
 ## Installation & Deployment
 
-This project ships platform packages built with fpm. Build once from source to produce .deb and .rpm, then install them with your system’s package manager.
+This project now installs via a dedicated virtual environment (venv) under a configurable PREFIX and exposes thin wrappers in PREFIX/bin. No global pip, no system site‑packages, and no distro-specific packaging required.
 
 ### Prerequisites
 
-- Python ≥ 3.9 is available on the build host.
-- Ruby fpm installed on the build host:
-  - Debian/Ubuntu: `sudo apt-get install ruby-dev gcc make && sudo gem install --no-document fpm`
-  - RHEL/Rocky/CentOS: `sudo dnf install ruby-devel gcc make rpm-build && sudo gem install --no-document fpm`
+- Python ≥ 3.9 available on the target host
+- Python venv module installed
+  - Debian/Ubuntu: `sudo apt install -y python3-venv`
+  - RHEL/Rocky/CentOS: usually included with python3, else `sudo dnf install -y python3-venv`
+- Optional: `uv` for building the wheel (or use any PEP 517 builder)
 
-### Build (on a build host)
+### Build (on any host)
 
 1) Clone and prepare
 ```bash
@@ -90,47 +91,47 @@ uv build
 # Produces: dist/slurm_helper_scripts-<VERSION>-py3-none-any.whl
 ```
 
-3) Package into .deb and .rpm using the provided script
+Copy the built wheel to the target node(s) if building elsewhere.
+
+### Install/Upgrade (on target nodes)
+
+Use the provided Makefile to install into a system venv and link entrypoints:
+
+- Default locations:
+  - Venv: PREFIX/lib/slurm-helper-scripts/venv (default PREFIX=/usr/local)
+  - Binaries: PREFIX/bin/{squota,savail}
+
+Run one of the following:
+
+- If running as root:
 ```bash
-# Ensure the script is executable
-chmod +x scripts/build_pkgs.sh
-# Build packages (uses /usr/bin/python3 and installs under /usr/local)
-./scripts/build_pkgs.sh
-# Outputs: ./slurm-helper-scripts-<VERSION>-1.noarch.rpm and ./slurm-helper-scripts_<VERSION>_all.deb
+make install WHEEL=/path/to/slurm_helper_scripts-<VERSION>-py3-none-any.whl
+```
+
+- If using sudo:
+```bash
+make install SUDO=sudo WHEEL=/path/to/slurm_helper_scripts-<VERSION>-py3-none-any.whl
 ```
 
 Notes:
-- The script forces /usr/bin/python3 and shebangs to avoid venv/conda bleed-through.
-- Architecture is set via fpm’s `-a all` (per fpm docs), resulting in `all` for deb and `noarch` for rpm.
+- If WHEEL is omitted, Makefile will pick the newest wheel under ./dist.
+- You can change the install prefix or Python used to create the venv:
+  - `make install PREFIX=/usr`
+  - `make install PYTHON_BIN=/usr/bin/python3.10`
+- Re-running `make install` acts as an upgrade (it installs/updates the wheel inside the venv and relinks the wrappers).
 
-### Install (on target nodes)
-
-- RPM-based (RHEL/Rocky/CentOS):
-```bash
-sudo dnf install ./slurm-helper-scripts-<VERSION>-1.noarch.rpm
-```
-
-- DEB-based (Debian/Ubuntu):
-```bash
-sudo apt install ./slurm-helper-scripts_<VERSION>_all.deb
-```
-
-After installation, the commands are available system-wide:
+After installation, ensure PREFIX/bin is on PATH, then:
 ```bash
 squota --help
 savail --help
 ```
 
-### Upgrade / Uninstall
+### Uninstall
 
-- Upgrade:
-  - Build a new wheel and re-run `./scripts/build_pkgs.sh`, then:
-    - RPM: `sudo dnf upgrade ./slurm-helper-scripts-<NEWVER>-1.noarch.rpm`
-    - DEB: `sudo apt install ./slurm-helper-scripts_<NEWVER>_all.deb`
-
-- Uninstall:
-  - RPM: `sudo dnf remove slurm-helper-scripts`
-  - DEB: `sudo apt remove slurm-helper-scripts`
+Remove the venv and the wrapper symlinks:
+```bash
+make uninstall
+```
 
 ## License
 
