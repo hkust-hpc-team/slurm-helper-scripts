@@ -4,8 +4,8 @@
 
 This repository provides a suite of command-line tools designed to simplify resource management and monitoring on Slurm-based High-Performance Computing (HPC) clusters.
 
-- **`squota`**: A powerful Python-based tool that generates detailed resource utilization reports. It offers a hierarchical view (Account > User > Partition) and tracks usage against limits defined in Slurm associations.
-- **`savail`**: A handy Bash script that provides a quick, color-coded summary of node availability within a specified partition, including CPU and GPU resources.
+- `squota`: Python-based tool that generates detailed resource utilization reports (Account > User > Partition) and tracks usage against limits defined in Slurm associations.
+- `savail`: Bash-based tool that provides a quick, color-coded summary of node availability within a specified partition, including CPU and GPU resources.
 
 ## Features
 
@@ -14,7 +14,18 @@ This repository provides a suite of command-line tools designed to simplify reso
 - Tracks usage against TRES limits from Slurm associations.
 - Automatically filters "runaway" jobs (jobs present in `sacct` but not `squeue`) for more accurate reports.
 - Customizable reporting period (start/end dates).
-- Ability to filter by a specific user or account.
+- Flexible filtering:
+  - `-A/--account`: filter by account
+  - `-u/--user`: filter by one or more users (repeatable or comma-separated)
+  - `-p/--partition`: query one or more partitions
+    - Default: only visible partitions (from `sinfo`)
+    - If specified, the given partitions are used as-is (even if not visible)
+- CSV export:
+  - `--csv [lv1|lv2]` outputs CSV instead of the human-readable table
+  - If `--csv` is provided without a value, defaults to `lv1`
+  - Only one level at a time:
+    - `lv1`: account-partition totals
+    - `lv2`: account-user-partition details
 
 ### `savail`
 - Color-coded output for node states (IDLE, MIXED, ALLOCATED, DRAIN, etc.).
@@ -26,7 +37,7 @@ This repository provides a suite of command-line tools designed to simplify reso
 
 ## Sample Output
 
-### `squota`
+### `squota` (Human-readable)
 ```text
 $ squota -u bob -S 2024-09-01
 
@@ -50,6 +61,26 @@ Usage report from 2024-09-01 to 2025-02-06
 Note: "Hours" refers to GPU-hour for GPU partitions and CPU-core-hour for CPU partitions.
 ```
 
+### `squota` CSV
+
+- Level 1 (account-partition totals)
+```csv
+$ squota --csv
+Account,amd,intel,gpu-a30,gpu-l20,gpu-rtx5880
+groupA,0.00,0.00,1192.72,0.00,0.00
+groupB,431826.54,0.00,0.00,0.00,0.00
+groupC,0.00,0.00,0.00,0.00,0.00
+```
+
+- Level 2 (account-user-partition details)
+```csv
+$ squota --csv lv2
+Account,User,amd,intel,gpu-a30,gpu-l20,gpu-rtx5880
+groupA,userA,0.00,0.00,1192.72,0.00,0.00
+groupA,userB,1.00,0.00,1192.72,0.00,1.00
+groupB,userC,431826.54,0.00,0.00,0.00,0.00
+```
+
 ### `savail`
 ```bash
 $ savail -p gpu-l20 --sort=gpu
@@ -60,14 +91,26 @@ gpu17  IDLE          64/64                4/4
 gpu19  IDLE          64/64                4/4       
 gpu20  IDLE          64/64                4/4       
 gpu21  IDLE          64/64                4/4       
-gpu16  MIXED         48/64                3/4  
+gpu16  MIXED         48/64                3/4
 ```
 
 ---
 
+## Usage
+
+- Filter by partitions (visible or not):
+  - `squota -p gpu-a30,gpu-l20`
+- Filter by multiple users:
+  - `squota -u alice,bob`
+- CSV export:
+  - Default level (when no value given): `squota --csv` → `lv1`
+  - Explicit level: `squota --csv lv1` or `squota --csv lv2`
+- Human-readable table:
+  - `squota -A mygroup -S 2024-09-01 -E 2024-09-30`
+
 ## Installation & Deployment
 
-This project now installs via a dedicated virtual environment (venv) under a configurable PREFIX and exposes thin wrappers in PREFIX/bin. No global pip, no system site‑packages, and no distro-specific packaging required.
+This project installs via a dedicated virtual environment (venv) under a configurable PREFIX and exposes thin wrappers in PREFIX/bin. No global pip, no system site‑packages, and no distro-specific packaging required.
 
 ### Prerequisites
 
@@ -120,19 +163,12 @@ Notes:
   - `make install PYTHON_BIN=/usr/bin/python3.10`
 - Re-running `make install` acts as an upgrade (it installs/updates the wheel inside the venv and relinks the wrappers).
 
-After installation, ensure PREFIX/bin is on PATH, then:
+After installation:
 ```bash
 squota --help
 savail --help
 ```
 
-### Uninstall
-
-Remove the venv and the wrapper symlinks:
-```bash
-make uninstall
-```
-
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License. See the [LICENSE](LICENSE) file for details.

@@ -21,26 +21,38 @@ def get_available_partitions() -> List[str]:
     output = _run_command(["sinfo", "--noheader", "-o", "%P"])
     return output.split('\n') if output else []
 
-def get_association_data(account: Optional[str] = None, user: Optional[str] = None) -> List[Dict[str, str]]:
-    """Get association data from sacctmgr."""
-    avail_partitions = ",".join(get_available_partitions())
-    if not avail_partitions:
-        return []
-    
-    cmd = [
-        "sacctmgr", "show", "association", f"partition={avail_partitions}",
-        "--parsable", "--noheader", "format=Account,User,Partition,GrpTRESMins", "--readonly"
-    ]
+def get_association_data(
+    account: Optional[str] = None,
+    users: Optional[List[str]] = None,
+    partitions: Optional[List[str]] = None
+) -> List[Dict[str, str]]:
+    """
+    Get association data from sacctmgr.
+
+    - If 'partitions' is provided, use it directly (even if not visible via sinfo).
+    - Otherwise, use visible partitions from sinfo.
+    - Results are filtered by 'users' (if provided) in Python, to avoid sacctmgr's AND semantics.
+    """
+    if partitions is None:
+        avail_partitions = ",".join(get_available_partitions())
+        if not avail_partitions:
+            return []
+    else:
+        avail_partitions = ",".join(partitions)
+
+    cmd = ["sacctmgr", "show", "association"]
+    if avail_partitions:
+        cmd.append(f"partition={avail_partitions}")
+    cmd += ["--parsable", "--noheader", "format=Account,User,Partition,GrpTRESMins", "--readonly"]
     if account:
         cmd.append(f"account={account}")
-    if user:
-        cmd.append(f"user={user}")
-        
+    # We intentionally do NOT add user=... here; we will filter after fetching.
+
     output = _run_command(cmd)
     associations = []
     if not output:
         return []
-        
+
     for line in output.split('\n'):
         if line:
             parts = line.split('|')
@@ -51,10 +63,23 @@ def get_association_data(account: Optional[str] = None, user: Optional[str] = No
                     'partition': parts[2],
                     'tres_mins': parts[3]
                 })
+
+    if users:
+        users_set = set(users)
+        # Keep account-level limits (user == "") and the selected users
+        associations = [a for a in associations if (a['user'] in users_set) or (a['user'] == "")]
     return associations
 
-def get_usage_data(start_date: str, end_date: str, account: Optional[str] = None, username: Optional[str] = None) -> List[str]:
-    """Get raw usage data from sacct."""
+def get_usage_data(
+    start_date: str,
+    end_date: str,
+    account: Optional[str] = None,
+    users: Optional[List[str]] = None
+) -> List[str]:
+    """Get raw usage data from sacct.
+
+    If 'users' is provided, it's joined via comma and passed to '-u'.
+    """
     cmd = [
         "sacct", "-n", "-P", "-X",
         "-S", start_date,
@@ -64,9 +89,9 @@ def get_usage_data(start_date: str, end_date: str, account: Optional[str] = None
     ]
     if account:
         cmd.extend(["-A", account])
-    if username:
-        cmd.extend(["-u", username])
-        
+    if users:
+        cmd.extend(["-u", ",".join(users)])
+
     output = _run_command(cmd)
     return output.split('\n') if output else []
 
@@ -81,7 +106,7 @@ def get_runaway_jobs() -> Set[str]:
         ['squeue', '--noheader', '-h', '-o', '%i']
     )
     running_jobs = {job.strip() for job in squeue_output.splitlines() if job.strip()}
-    
+
     runaway = all_jobs - running_jobs
     if runaway:
         print(f"Info: Found and excluded {len(runaway)} runaway jobs.", file=sys.stderr)
