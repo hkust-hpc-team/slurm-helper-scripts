@@ -53,6 +53,3 @@ def run():
         print(f'{YELLOW}Note: "Hours" refers to {RED}GPU-hour{YELLOW} for GPU partitions and {RED}CPU-core-hour{YELLOW} for CPU partitions.\nTo convert {RED}GPU-hour{YELLOW} to {RED}GPU-node-hour{YELLOW}, divide {RED}GPU-hour{YELLOW} by 8.{RESET}')
     else:
         print(f'{YELLOW}Note: "Hours" refers to {RED}GPU-hour{YELLOW} for GPU partitions and {RED}CPU-core-hour{YELLOW} for CPU partitions.{RESET}')
-
-if __name__ == "__main__":
-    run()

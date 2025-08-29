@@ -12,7 +12,7 @@ requires-python = ">=3.9"
 dependencies = []
 
 [project.scripts]
-squota = "slurm_helper_scripts.main:run"
+squota = "slurm_helper_scripts.squota:run"
 savail = "slurm_helper_scripts.savail:run"
 
 [build-system]

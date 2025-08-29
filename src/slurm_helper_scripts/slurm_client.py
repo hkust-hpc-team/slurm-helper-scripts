@@ -1,6 +1,6 @@
 import subprocess
 import sys
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Set, Optional
 
 def _run_command(cmd: List[str]) -> str:
     """Helper function to run a command and handle errors."""
@@ -21,7 +21,7 @@ def get_available_partitions() -> List[str]:
     output = _run_command(["sinfo", "--noheader", "-o", "%P"])
     return output.split('\n') if output else []
 
-def get_association_data(account: str = None, user: str = None) -> List[Dict[str, str]]:
+def get_association_data(account: Optional[str] = None, user: Optional[str] = None) -> List[Dict[str, str]]:
     """Get association data from sacctmgr."""
     avail_partitions = ",".join(get_available_partitions())
     if not avail_partitions:
@@ -53,7 +53,7 @@ def get_association_data(account: str = None, user: str = None) -> List[Dict[str
                 })
     return associations
 
-def get_usage_data(start_date: str, end_date: str, account: str = None, username: str = None) -> List[str]:
+def get_usage_data(start_date: str, end_date: str, account: Optional[str] = None, username: Optional[str] = None) -> List[str]:
     """Get raw usage data from sacct."""
     cmd = [
         "sacct", "-n", "-P", "-X",
