@@ -50,7 +50,7 @@ def render_report(usage_by_account, account_limits, title):
         details_table.add_column("User Total (Hours)", alignment="right")
         details_table.add_column("Partition Details", alignment="left")
 
-        for user, user_data in sorted(valid_users, key=lambda x: x[0]):
+        for user, user_data, _ in sorted(valid_users, key=lambda x: x[0]):
             user_total = sum(p["hours"] for p in user_data["partitions"].values())
             # Do not sum quota across partitions: different partitions may
             # track different resource types (CPU-core-hours vs GPU-hours),
