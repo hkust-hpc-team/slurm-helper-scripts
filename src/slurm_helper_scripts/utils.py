@@ -2,14 +2,23 @@ import socket
 
 
 def parse_tres(tres_str):
-    """Given a TRES string, return a dictionary of resource limits."""
+    """Given a TRES string, return a dictionary of resource limits.
+
+    GPU TRES keys may include a type specifier (e.g. ``gres/gpu:a30``).
+    These are normalised to the bare ``gres/gpu`` key so that the rest of
+    the code can use a single lookup regardless of GPU model.  Values for
+    multiple GPU types on the same association are summed.
+    """
     if not tres_str:
         return {}
     tres_dict = {}
-    for item in tres_str.split(','):
-        if '=' in item:
-            key, value = item.split('=')
-            tres_dict[key] = int(value)
+    for item in tres_str.split(","):
+        if "=" in item:
+            key, value = item.split("=", 1)
+            # Normalise typed GPU keys: gres/gpu:a30 -> gres/gpu
+            if key.startswith("gres/gpu"):
+                key = "gres/gpu"
+            tres_dict[key] = tres_dict.get(key, 0) + int(value)
     return tres_dict
 
 
@@ -28,8 +37,12 @@ def get_cluster() -> str:
     """
     hostname = socket.gethostname()
     hpc4_hosts = ["login1", "login2", "hpc4head-01", "hpc4head-02"]
-    superpod_hosts = ["slogin-01", "slogin-02",
-                      "bcm2suheadnode-01", "bcm2suheadnode-02"]
+    superpod_hosts = [
+        "slogin-01",
+        "slogin-02",
+        "bcm2suheadnode-01",
+        "bcm2suheadnode-02",
+    ]
     if hostname in hpc4_hosts:
         return "hpc4"
     elif hostname in superpod_hosts:
