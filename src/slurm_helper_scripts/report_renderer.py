@@ -32,7 +32,7 @@ def render_report(usage_by_account, account_limits, title):
         valid_users = []
         for user, user_data in account_data["users"].items():
             user_total = sum(p["hours"] for p in user_data["partitions"].values())
-            valid_users.append((user, user_data))
+            valid_users.append((user, user_data, user_total))
 
         if not valid_users:
             continue
