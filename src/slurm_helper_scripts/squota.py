@@ -147,7 +147,16 @@ def run():
     args = parser.parse_args()
 
     # Handle --all flag: override start date to beginning of time
-    start_date = "1970-01-01" if args.all else args.start
+    default_start = datetime.date.today().replace(day=1).isoformat()
+    if args.all:
+        if args.start != default_start:
+            print(
+                f"{YELLOW}Warning: --all overrides --start; using 1970-01-01{RESET}",
+                file=sys.stderr,
+            )
+        start_date = "1970-01-01"
+    else:
+        start_date = args.start
 
     # Normalize users and partitions
     users = _normalize_users(args.users)
